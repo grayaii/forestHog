@@ -1,19 +1,19 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='truffleHog',
-    version='2.0.92',
+    name='forestHog',
+    version='0.9',
     description='Searches through git repositories for high entropy strings, digging deep into commit history.',
-    url='https://github.com/dxa4481/truffleHog',
-    author='Dylan Ayrey',
-    author_email='dxa4481@rit.edu',
+    url='https://github.com/EbryxLabs/forestHog',
+    author='Rana Awais',
+    author_email='rana.awais@ebryx.com',
     license='GNU',
-    packages = ['truffleHog'],
+    packages = ['forestHog'],
     install_requires=[
         'GitPython == 2.1.1',
         'truffleHogRegexes == 0.0.7'
     ],
     entry_points = {
-      'console_scripts': ['trufflehog = truffleHog.truffleHog:main'],
+      'console_scripts': ['foresthog = forestHog.forestHog:main'],
     },
 )
