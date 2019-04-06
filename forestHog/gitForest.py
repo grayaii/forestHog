@@ -3,14 +3,17 @@ import git
 import sys
 import json
 import stat
+import shutil
 import argparse
 import subprocess
+
+from .forestHog import bcolors
 
 
 def get_params():
     parser = argparse.ArgumentParser()
     parser.add_argument('command', help='defines foresthog operations.',
-                        choices=['init', 'run', 'update'])
+                        choices=['init', 'run', 'update', 'destroy'])
 
     parser.add_argument(
         '-trigger', help='runs forestHog for certain git event.',
@@ -19,11 +22,11 @@ def get_params():
         '-custom-rules', default=dict(),
         help='custom rules files to check the git repo against.')
 
-    parser.add_argument('-entropy-wc', default=0,
+    parser.add_argument('-entropy-wc', default=0, type=int,
                         help='sets string length for calculating entropy.')
-    parser.add_argument('-entropy-hex-thresh', default=0,
+    parser.add_argument('-entropy-hex-thresh', default=0, type=float,
                         help='sets entropy threshold for hex strings.')
-    parser.add_argument('-entropy-b64-thresh', default=0,
+    parser.add_argument('-entropy-b64-thresh', default=0, type=float,
                         help='sets entropy threshold for base64 strings.')
     parser.add_argument('--no-regex', action='store_true',
                         help='disables regex checks for git repo.')
@@ -43,8 +46,7 @@ def get_params():
 def get_git_root():
 
     git_repo = git.Repo(os.getcwd(), search_parent_directories=True)
-    git_root = git_repo.git.rev_parse("--show-toplevel")
-    print('GIT ROOT: %s' % (git_root))
+    git_root = git_repo.git.rev_parse('--show-toplevel')
     return git_root
 
 
@@ -100,7 +102,7 @@ def initialize(params):
 
     config_filename = os.path.join(forest_dir, 'config.json')
     json.dump(data, open(config_filename, 'w'), indent=2)
-    print('git-forest have been initialized: %s' % (config_filename))
+    print('git-forest has been initialized: %s' % (config_filename))
     print(json.dumps(data, indent=2), end='\n\n')
 
     triggers = ['pre-push', 'post-commit']
@@ -114,11 +116,11 @@ def initialize(params):
             sys.executable), 'git-forest'), trigger))
         f.close()
 
-        print('Changing hook permissions...')
+        print('Changing hook permissions. ', end='')
         fstat = os.stat(hookname)
         os.chmod(hookname, fstat.st_mode | stat.S_IXUSR |
                  stat.S_IXGRP | stat.S_IXOTH)
-        print('Hook added to git: %s' % os.path.join(hooks_dir, trigger))
+        print('Hook added: %s' % os.path.join(hooks_dir, trigger))
 
 
 def update(params):
@@ -223,6 +225,7 @@ def run(params):
             args.append(tmp_rules)
 
     args.append(root)
+    args = [str(x) for x in args]
     if (config.get('pre_push') and params.trigger == 'pre-push') or \
             (config.get('post_commit') and params.trigger == 'post-commit'):
 
@@ -232,8 +235,44 @@ def run(params):
             [command, *args], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, _ = proc.communicate()
         rcode = proc.returncode
-        print(out.decode('utf8'))
+        out = out.decode('utf8').strip('\n')
+        if out:
+            print(out)
+        if rcode is 0:
+            message = '-'*10 + ' [Code analysis PASSED.] ' + '-'*10
+            message = bcolors.OKGREEN + message + bcolors.ENDC
+        else:
+            message = '>'*10 + ' [Code analysis FAILED.] ' + '<'*10
+            message = bcolors.FAIL + message + bcolors.ENDC
+
+        print(message, end='\n\n')
         exit(rcode)
+
+
+def destroy(params):
+
+    root = get_git_root()
+    if not root:
+        print('FATAL: not a git repo.')
+        exit(1)
+
+    hooks_dir = os.path.join(root, '.git', 'hooks')
+    if not os.path.isdir(hooks_dir):
+        print('FATAL: could not find hooks directory for git.')
+        exit(1)
+
+    forest_dir = os.path.join(root, '.forest')
+    if not os.path.isdir(forest_dir):
+        print('WARNING: could not find .forest directory at git root.')
+    else:
+        shutil.rmtree(forest_dir)
+        print('Removed .forest folder from git root.')
+
+    for trigger in ['pre-push', 'post-commit']:
+        hookname = os.path.join(hooks_dir, trigger)
+        if os.path.isfile(hookname):
+            os.rename(hookname, hookname + '.bkp')
+            print('Hook disconnected and changed to:', hookname + '.bkp')
 
 
 def main():
@@ -245,6 +284,8 @@ def main():
         run(params)
     elif params.command == 'update':
         update(params)
+    elif params.command == 'destroy':
+        destroy(params)
 
 
 if __name__ == "__main__":
