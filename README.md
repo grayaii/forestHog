@@ -228,3 +228,9 @@ Rewriting history may sound cool but if done carelessly, it can mess up your ent
 >*Use it with great care and use it only as a last resort.*
 
 Lastly, rewriting history means you're making a change in a branch. You will have to notify your coworkers to have them clean their branches as well to make a seemless git structure. Otherwise, they will face errors upon merging and pushing code.
+
+## Features Wish-list
+Following improvements can be done in future.  
+- `pre-commit` hook should be added to avoid committing sensitive data. Currently, `post-commit` and `pre-push` are supported.
+- Some sort of whitelisting mechanism should be introduced so that certain regex patterns, even if found, can be whitelisted forcibly.
+
