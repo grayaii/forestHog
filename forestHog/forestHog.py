@@ -34,34 +34,53 @@ class bcolors:
     UNDERLINE = '\033[4m'
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
-    parser.add_argument("--show-regex", action="store_true", help="prints out regexes that will computed against repo")
-    parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
-    parser.add_argument("--rules", dest="rules", default=str(), help="Ignore default regexes and source from json list file")
-    parser.add_argument("--add-rules", default=str(), help="Adds more regex rules along with default ones from a json list file")
-    parser.add_argument("--entropy", dest="do_entropy", action='store_true', help="Enable entropy checks")
-    parser.add_argument("--entropy-wc", type=int, default=20, help="Segments n-length words to check entropy against [default: 20]")
-    parser.add_argument("--entropy-b64-thresh", type=float, default=4.5, help="User defined entropy threshold for base64 strings [default: 4.5]")
-    parser.add_argument("--entropy-hex-thresh", type=float, default=3, help="User defined entropy threshold for hex strings [default: 3.0]")
-    parser.add_argument("--since-commit", dest="since_commit", default=None, help="Only scan from a given commit hash")
-    parser.add_argument("--max-depth", dest="max_depth", default=1000000, help="The max commit depth to go back when searching for secrets")
-    parser.add_argument("--branch", dest="branch", default=str(), help="Name of the branch to be scanned")
-    parser.add_argument("--repo-path", type=str, dest="repo_path", default=str(), help="Path to the cloned repo. If provided, git_url will not be used")
-    parser.add_argument("--cleanup", dest="cleanup", action="store_true", help="Clean up all temporary result files")
-    parser.add_argument('git_url', type=str, help='URL for secret searching')
-    args = parser.parse_args()
+def get_args():
 
-    rules = {}
+    parser = argparse.ArgumentParser(
+        description='Find secrets hidden in the depths of git.')
+    parser.add_argument('--json', dest="output_json",
+                        action="store_true", help="Output in JSON")
+    parser.add_argument("--show-regex", action="store_true",
+                        help="prints out regexes that will computed against repo")
+    parser.add_argument("--regex", dest="do_regex",
+                        action="store_true", help="Enable high signal regex checks")
+    parser.add_argument("--rules", dest="rules", default=str(),
+                        help="Ignore default regexes and source from json list file")
+    parser.add_argument("--add-rules", default=str(),
+                        help="Adds more regex rules along with default ones from a json list file")
+    parser.add_argument("--entropy", dest="do_entropy",
+                        action='store_true', help="Enable entropy checks")
+    parser.add_argument("--entropy-wc", type=int, default=20,
+                        help="Segments n-length words to check entropy against [default: 20]")
+    parser.add_argument("--entropy-b64-thresh", type=float, default=4.5,
+                        help="User defined entropy threshold for base64 strings [default: 4.5]")
+    parser.add_argument("--entropy-hex-thresh", type=float, default=3,
+                        help="User defined entropy threshold for hex strings [default: 3.0]")
+    parser.add_argument("--since-commit", dest="since_commit",
+                        default=None, help="Only scan from a given commit hash")
+    parser.add_argument("--max-depth", dest="max_depth", default=1000000,
+                        help="The max commit depth to go back when searching for secrets")
+    parser.add_argument("--branch", dest="branch", default=str(),
+                        help="Name of the branch to be scanned")
+    parser.add_argument("--repo-path", type=str, dest="repo_path", default=str(),
+                        help="Path to the cloned repo. If provided, git_url will not be used")
+    parser.add_argument("--cleanup", dest="cleanup", action="store_true",
+                        help="Clean up all temporary result files")
+    parser.add_argument('git_url', type=str, help='URL for secret searching')
+    return parser.parse_args()
+
+
+def validate_args(args):
+
+    rules = dict()
     if args.rules:
         try:
-            with open(args.rules, "r") as ruleFile:
+            with open(args.rules, 'r') as ruleFile:
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
                     rules[rule] = re.compile(rules[rule])
-        except (IOError, ValueError) as e:
-            raise("Error reading rules file")
+        except (IOError, ValueError):
+            raise('Error reading rules file.')
         for regex in dict(regexes):
             del regexes[regex]
         for regex in rules:
@@ -73,30 +92,39 @@ def main():
                 rules = json.loads(ruleFile.read())
                 for rule in rules:
                     regexes[rule] = re.compile(rules[rule])
-        except (IOError, ValueError) as e:
-            raise("Error reading rules file")
+        except (IOError, ValueError):
+            raise('Error reading rules file.')
 
     if args.show_regex:
         print(json.dumps({
             key: value.pattern for key, value in regexes.items()
-            }, indent=2))
+        }, indent=2))
         exit(0)
 
-    entropy_options = {
+    return {
         'do_entropy': args.do_entropy, 'entropy_wc': args.entropy_wc,
         'entropy_b64_thresh': args.entropy_b64_thresh,
         'entropy_hex_thresh': args.entropy_hex_thresh
     }
-    output = find_strings(args.git_url, args.since_commit, args.max_depth, args.output_json, args.do_regex, entropy_options, surpress_output=False, branch=args.branch, repo_path=args.repo_path)
-    project_path = output["project_path"]
-    shutil.rmtree(project_path, onerror=del_rw)
 
-    if args.cleanup:
-        clean_up(output)
-    if output["foundIssues"]:
-        sys.exit(1)
-    else:
-        sys.exit(0)
+
+def process_repo(args, entropy_options):
+
+    output = find_strings(
+        args.git_url, args.since_commit, args.max_depth,
+        args.output_json, args.do_regex, entropy_options,
+        surpress_output=False, branch=args.branch, repo_path=args.repo_path)
+
+    shutil.rmtree(output['project_path'], onerror=del_rw)
+    clean_up(output) if args.cleanup else None
+    sys.exit(1) if output['foundIssues'] else sys.exit(0)
+
+
+def main():
+
+    args = get_args()
+    entropy_options = validate_args(args)
+    process_repo(args, entropy_options)
 
 
 def del_rw(action, name, exc):
@@ -104,7 +132,6 @@ def del_rw(action, name, exc):
     if os.path.exists(name):
         os.chmod(name, stat.S_IWRITE)
         os.remove(name)
-
 
 
 def shannon_entropy(data, iterator):
