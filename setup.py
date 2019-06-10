@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='forestHog',
-    version='1.3',
+    version='1.3.6',
     description='Searches through git repositories for high entropy strings, '
                 'digging deep into commit history.',
     long_description=long_description,

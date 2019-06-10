@@ -108,7 +108,7 @@ def validate_args(args):
     }
 
 
-def process_repo(args, entropy_options):
+def process_repo(args, entropy_options, exit=True):
 
     output = find_strings(
         args.git_url, args.since_commit, args.max_depth,
@@ -117,7 +117,10 @@ def process_repo(args, entropy_options):
 
     shutil.rmtree(output['project_path'], onerror=del_rw)
     clean_up(output) if args.cleanup else None
-    sys.exit(1) if output['foundIssues'] else sys.exit(0)
+    if exit:
+        sys.exit(1) if output['foundIssues'] else sys.exit(0)
+    else:
+        return output
 
 
 def main():
@@ -364,7 +367,3 @@ def clean_up(output):
     issues_path = output.get("issues_path", None)
     if issues_path and os.path.isdir(issues_path):
         shutil.rmtree(output["issues_path"])
-
-
-if __name__ == "__main__":
-    main()
