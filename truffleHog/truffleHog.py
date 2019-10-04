@@ -21,7 +21,7 @@ from truffleHogRegexes.regexChecks import regexes
 
 def main():
     parser = argparse.ArgumentParser(description='Find secrets hidden in the depths of git.')
-    parser.add_argument('--exclude_output_keys', dest="exclude_output_keys", help="Excludes comma separated list of keys, to reduce output noise")
+    parser.add_argument('--exclude_output_keys', dest="exclude_output_keys", default=None, help="Excludes comma separated list of keys, to reduce output noise")
     parser.add_argument('--json', dest="output_json", action="store_true", help="Output in JSON")
     parser.add_argument("--regex", dest="do_regex", action="store_true", help="Enable high signal regex checks")
     parser.add_argument("--rules", dest="rules", help="Ignore default regexes and source from json list file")
@@ -55,11 +55,12 @@ def main():
         for regex in rules:
             regexes[regex] = rules[regex]
     do_entropy = str2bool(args.do_entropy)
+    exclude_output_keys = [] if args.exclude_output_keys is None else args.exclude_output_keys.split(',')
     output = find_strings(args.git_url, args.since_commit, args.max_depth,
                           args.output_json, args.do_regex, do_entropy,
                           surpress_output=False, branch=args.branch,
                           repo_path=args.repo_path,
-                          exclude_output_keys=args.exclude_output_keys.split(','))
+                          exclude_output_keys=exclude_output_keys)
     project_path = output["project_path"]
     shutil.rmtree(project_path, onerror=del_rw)
     if args.cleanup:
@@ -144,7 +145,7 @@ def print_results(printJson, issue, exclude_output_keys):
 
     if printJson:
         for exclude_key in exclude_output_keys:
-            del issue[exclude_output_keys]
+            del issue[exclude_key]
         print(json.dumps(issue, sort_keys=True))
     else:
         print("~~~~~~~~~~~~~~~~~~~~~")
